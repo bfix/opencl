@@ -13,7 +13,9 @@ import (
 
 func main() {
 	var devName string
+	var count int
 	flag.StringVar(&devName, "d", "", "device name")
+	flag.IntVar(&count, "c", 1000, "iterations")
 	flag.Parse()
 
 	ctx, err := lib.NewOpenCLContext()
@@ -43,7 +45,7 @@ func main() {
 	}
 
 	start := time.Now()
-	for range 10 {
+	for range count {
 		if err = lib.CopyIn(runner, 0, in); err != nil {
 			log.Println("writing input buffer failed")
 			log.Fatal(err)
@@ -65,7 +67,7 @@ func main() {
 
 	out2 := make([]byte, 20*num)
 	start = time.Now()
-	for range 10000 {
+	for range 1000 * count {
 		hsh := gsha1.New()
 		hsh.Write([]byte("test"))
 		out2 = hsh.Sum(nil)
