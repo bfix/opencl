@@ -1,113 +1,78 @@
 package main
 
 import (
-	"crypto/sha1"
+	gsha1 "crypto/sha1"
 	_ "embed"
 	"encoding/binary"
 	"encoding/hex"
+	"flag"
 	"log"
+	"opencl/lib"
+	"opencl/lib/sha1"
 	"time"
-
-	cl "github.com/CyberChainXyz/go-opencl"
 )
 
-var sha1Name = "sha1_kernel"
-
-//go:embed sha1.cl
-var sha1Src string
-
 func main() {
+	var devName string
+	flag.StringVar(&devName, "d", "", "device name")
+	flag.Parse()
 
-	info, err := cl.Info()
+	ctx, err := lib.NewOpenCLContext()
 	if err != nil {
-		log.Println("no opencl device(s)")
 		log.Fatal(err)
 	}
-
-	var device *cl.OpenCLDevice
-loop:
-	for _, pf := range info.Platforms {
-		if pf.Name == "NVIDIA CUDA" {
-			for _, dev := range pf.Devices {
-				device = dev
-				break loop
-			}
+	if len(devName) == 0 {
+		for i, dev := range ctx.ListDevices() {
+			log.Printf("%d: %s\n", i+1, dev)
 		}
+		return
 	}
 
-	runner, err := device.InitRunner()
+	srcs := []string{sha1.Src}
+	labels := []string{sha1.Name}
+	num := 1000
+	inSize := 68 * num
+	in := make([]byte, inSize)
+	outSize := 20 * num
+	out := make([]byte, outSize)
+
+	for i := range num {
+		binary.LittleEndian.PutUint32(in[i*68:], 4)
+		copy(in[i*68+4:], []byte("test"))
+	}
+
+	runner, err := ctx.Prepare(devName, srcs, labels, num, inSize, outSize)
 	if err != nil {
-		log.Println("no runner")
 		log.Fatal(err)
-	}
-	defer runner.Free()
-
-	err = runner.CompileKernels([]string{sha1Src}, []string{sha1Name}, "")
-	if err != nil {
-		log.Println("compile kernel failed")
-		log.Fatal(err)
-	}
-
-	inBuf, err := runner.CreateEmptyBuffer(cl.READ_ONLY, 1028)
-	if err != nil {
-		log.Println("create input buffer failed")
-		log.Fatal(err)
-	}
-
-	outBuf, err := runner.CreateEmptyBuffer(cl.WRITE_ONLY, 20)
-	if err != nil {
-		log.Println("create output buffer failed")
-		log.Fatal(err)
-	}
-
-	in := make([]byte, 1028)
-	out := make([]byte, 20)
-
-	var size uint32 = 4
-	binary.LittleEndian.PutUint32(in, size)
-	copy(in[4:], []byte("test"))
-
-	args := []cl.KernelParam{
-		cl.BufferParam(inBuf),
-		cl.BufferParam(outBuf),
 	}
 
 	start := time.Now()
-	for range 10000 {
-		if err = cl.WriteBuffer(runner, 0, inBuf, in, true); err != nil {
+	for range 10 {
+		if err = runner.CopyIn(0, in); err != nil {
 			log.Println("writing input buffer failed")
 			log.Fatal(err)
 		}
-
-		if err = runner.RunKernel(
-			sha1Name,
-			1,
-			[]uint64{0},
-			[]uint64{1024},
-			[]uint64{1024},
-			args,
-			true,
-		); err != nil {
+		if err = runner.Run(sha1.Name); err != nil {
 			log.Println("running kernel failed")
 			log.Fatal(err)
 		}
 
-		if err = cl.ReadBuffer(runner, 0, outBuf, out); err != nil {
+		if err = runner.CopyOut(0, out); err != nil {
 			log.Println("reading output buffer failed")
 			log.Fatal(err)
 		}
 
-		for i := range 5 {
+		for i := range 5 * num {
 			v := binary.LittleEndian.Uint32(out[4*i : 4*i+4])
 			binary.BigEndian.PutUint32(out[4*i:4*i+4], v)
 		}
 	}
-	log.Printf("hash = %s\n", hex.EncodeToString(out))
+	log.Printf("hash = %s\n", hex.EncodeToString(out[:20]))
 	log.Printf("GPU Elapsed: %s\n", time.Since(start))
 
 	start = time.Now()
 	for range 10000 {
-		hsh := sha1.New()
+		hsh := gsha1.New()
 		hsh.Write(in[4:8])
 		out = hsh.Sum(nil)
 	}
