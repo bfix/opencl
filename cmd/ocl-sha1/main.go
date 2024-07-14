@@ -31,24 +31,22 @@ func main() {
 	srcs := []string{sha1.Src}
 	labels := []string{sha1.Name}
 	num := 1000
-	inSize := 68 * num
-	in := make([]byte, inSize)
-	outSize := 20 * num
-	out := make([]byte, outSize)
+	in := make([]byte, 68*num)
+	out := make([]int32, 5*num)
 
 	for i := range num {
 		binary.LittleEndian.PutUint32(in[i*68:], 4)
 		copy(in[i*68+4:], []byte("test"))
 	}
 
-	runner, err := ctx.Prepare(devName, srcs, labels, num, inSize, outSize)
+	runner, err := ctx.Prepare(devName, srcs, labels, num, num*68, num*20)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	start := time.Now()
 	for range 10 {
-		if err = runner.CopyIn(0, in); err != nil {
+		if err = lib.CopyIn(runner, 0, in); err != nil {
 			log.Println("writing input buffer failed")
 			log.Fatal(err)
 		}
@@ -57,25 +55,24 @@ func main() {
 			log.Fatal(err)
 		}
 
-		if err = runner.CopyOut(0, out); err != nil {
+		if err = lib.CopyOut(runner, 0, out); err != nil {
 			log.Println("reading output buffer failed")
 			log.Fatal(err)
 		}
-
-		for i := range 5 * num {
-			v := binary.LittleEndian.Uint32(out[4*i : 4*i+4])
-			binary.BigEndian.PutUint32(out[4*i:4*i+4], v)
-		}
 	}
-	log.Printf("hash = %s\n", hex.EncodeToString(out[:20]))
 	log.Printf("GPU Elapsed: %s\n", time.Since(start))
+	log.Printf("hash = %08x%08x%08x%08x%08x\n",
+		uint32(out[0]), uint32(out[1]), uint32(out[2]),
+		uint32(out[3]), uint32(out[4]))
+	log.Println()
 
+	out2 := make([]byte, 20*num)
 	start = time.Now()
 	for range 10000 {
 		hsh := gsha1.New()
 		hsh.Write(in[4:8])
-		out = hsh.Sum(nil)
+		out2 = hsh.Sum(nil)
 	}
-	log.Printf("hash = %s\n", hex.EncodeToString(out))
 	log.Printf("CPU Elapsed: %s\n", time.Since(start))
+	log.Printf("hash = %s\n", hex.EncodeToString(out2))
 }

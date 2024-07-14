@@ -82,7 +82,7 @@ type OpenCLRunner struct {
 	num    int
 }
 
-func (r *OpenCLRunner) CopyIn(offset int, in []byte) (err error) {
+func CopyIn[T any](r *OpenCLRunner, offset int, in []T) (err error) {
 	return cl.WriteBuffer(r.inst, offset, r.inBuf, in, true)
 }
 
@@ -98,6 +98,6 @@ func (r *OpenCLRunner) Run(name string) (err error) {
 	)
 }
 
-func (r *OpenCLRunner) CopyOut(offset int, out []byte) (err error) {
+func CopyOut[T any](r *OpenCLRunner, offset int, out []T) (err error) {
 	return cl.ReadBuffer(r.inst, offset, r.outBuf, out)
 }
