@@ -3,7 +3,6 @@ package main
 import (
 	gsha1 "crypto/sha1"
 	_ "embed"
-	"encoding/binary"
 	"encoding/hex"
 	"flag"
 	"log"
@@ -31,12 +30,11 @@ func main() {
 	srcs := []string{sha1.Src}
 	labels := []string{sha1.Name}
 	num := 1000
-	in := make([]byte, 68*num)
-	out := make([]int32, 5*num)
+	in := make([]sha1.WorkIn, num)
+	out := make([]sha1.WorkOut, num)
 
 	for i := range num {
-		binary.LittleEndian.PutUint32(in[i*68:], 4)
-		copy(in[i*68+4:], []byte("test"))
+		in[i] = sha1.NewWorkIn([]byte("test"))
 	}
 
 	runner, err := ctx.Prepare(devName, srcs, labels, num, num*68, num*20)
@@ -62,15 +60,14 @@ func main() {
 	}
 	log.Printf("GPU Elapsed: %s\n", time.Since(start))
 	log.Printf("hash = %08x%08x%08x%08x%08x\n",
-		uint32(out[0]), uint32(out[1]), uint32(out[2]),
-		uint32(out[3]), uint32(out[4]))
+		out[0][0], out[0][1], out[0][2], out[0][3], out[0][4])
 	log.Println()
 
 	out2 := make([]byte, 20*num)
 	start = time.Now()
 	for range 10000 {
 		hsh := gsha1.New()
-		hsh.Write(in[4:8])
+		hsh.Write([]byte("test"))
 		out2 = hsh.Sum(nil)
 	}
 	log.Printf("CPU Elapsed: %s\n", time.Since(start))
