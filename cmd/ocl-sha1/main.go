@@ -50,6 +50,7 @@ func main() {
 			log.Println("writing input buffer failed")
 			log.Fatal(err)
 		}
+
 		if err = runner.Run(sha1.Name); err != nil {
 			log.Println("running kernel failed")
 			log.Fatal(err)
@@ -61,8 +62,8 @@ func main() {
 		}
 	}
 	log.Printf("GPU Elapsed: %s\n", time.Since(start))
-	log.Printf("hash = %08x%08x%08x%08x%08x\n",
-		out[0][0], out[0][1], out[0][2], out[0][3], out[0][4])
+	log.Printf("hash = %08x%08x%08x%08x%08x\n", out[0][0], out[0][1], out[0][2], out[0][3], out[0][4])
+	log.Printf("hash = %08x%08x%08x%08x%08x\n", out[250][0], out[250][1], out[250][2], out[250][3], out[250][4])
 	log.Println()
 
 	out2 := make([]byte, 20*num)

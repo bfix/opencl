@@ -56,6 +56,10 @@ __kernel void sha1_kernel(__global char *message,  __global uint *digest){
     uint W[80], temp, A,B,C,D,E;
 	int current_pad;
 
+	int idx = get_global_id(0);
+	message += 68*idx;
+	digest += 5*idx;
+
     ulen = *(__global uint *)message;
     message += 4;
 
